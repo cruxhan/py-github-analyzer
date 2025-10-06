@@ -1,0 +1,71 @@
+# ===================================================================
+# Python & Virtual Environments
+# ===================================================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+.env
+.venv
+env/
+venv/
+
+# ===================================================================
+# Build, Distribution & Packaging
+# ===================================================================
+build/
+dist/
+downloads/
+eggs/
+.eggs/
+sdist/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# ===================================================================
+# Test & Coverage Reports
+# ===================================================================
+.pytest_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+test_results/
+.tox/
+.nox/
+
+# ===================================================================
+# Project Specific
+# ===================================================================
+results/
+*.log
+logs/
+*.prof
+profile.stats
+
+# ===================================================================
+# IDEs and Editors
+# ===================================================
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+
+# ===================================================================
+# OS Generated Files
+# ===================================================================
+# macOS
+.DS_Store
+**/.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+ehthumbs.db
+[Dd]esktop.ini
+$RECYCLE.BIN/

@@ -1,0 +1,415 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "py-github-analyzer"
+version = "1.0.0"
+description = "High-performance async GitHub repository analyzer with AI-optimized code extraction and smart .env file support"
+authors = [
+    {name = "Han Jun-hee", email = "createbrain2heart@gmail.com"}
+]
+license = {text = "MIT"}
+readme = "README.md"
+keywords = ["github", "analyzer", "code", "repository", "ai", "async", "dotenv", "env"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License", 
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Software Development :: Version Control :: Git",
+    "Topic :: Text Processing :: General",
+    "Topic :: System :: Systems Administration",
+    "Topic :: Utilities",
+    "Framework :: AsyncIO",
+    "Environment :: Console"
+]
+requires-python = ">=3.8"
+dependencies = [
+    "httpx>=0.24.0",
+    "aiofiles>=0.8.0",
+    "rich>=13.0.0",
+    "python-dotenv>=1.0.0"
+]
+
+[project.optional-dependencies]
+dev = [
+    # Testing framework
+    "pytest>=7.4.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-mock>=3.11.0",
+    "pytest-cov>=4.1.0",
+    "pytest-xdist>=3.0.0",
+    "pytest-timeout>=2.1.0",
+    
+    # Code quality
+    "black>=23.7.0",
+    "flake8>=6.0.0",
+    "isort>=5.12.0",
+    "mypy>=1.5.0",
+    "bandit>=1.7.5",
+    
+    # Type checking
+    "types-requests>=2.31.0",
+    
+    # Build and distribution
+    "build>=0.10.0",
+    "twine>=4.0.2",
+    
+    # Development tools
+    "pre-commit>=3.0.0",
+    "tox>=4.0.0",
+    "poethepoet>=0.24.0"
+]
+
+test = [
+    "pytest>=7.4.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-mock>=3.11.0",
+    "pytest-cov>=4.1.0",
+    "pytest-xdist>=3.0.0",
+    "pytest-timeout>=2.1.0",
+]
+
+lint = [
+    "black>=23.7.0",
+    "flake8>=6.0.0",
+    "isort>=5.12.0",
+    "mypy>=1.5.0",
+    "bandit>=1.7.5",
+]
+
+docs = [
+    "sphinx>=7.0.0",
+    "sphinx-rtd-theme>=1.3.0",
+    "myst-parser>=2.0.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/cruxhan/py-github-analyzer"
+Repository = "https://github.com/cruxhan/py-github-analyzer"
+Documentation = "https://github.com/cruxhan/py-github-analyzer#readme"
+"Bug Reports" = "https://github.com/cruxhan/py-github-analyzer/issues"
+Changelog = "https://github.com/cruxhan/py-github-analyzer/releases"
+
+[project.scripts]
+py-github-analyzer = "py_github_analyzer.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["py_github_analyzer*"]
+exclude = ["tests*", "test_*", "docs*", "examples*"]
+
+[tool.setuptools.package-data]
+py_github_analyzer = ["*.json", "*.txt", "*.md"]
+
+# ==================================================
+# Testing Configuration
+# ==================================================
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+addopts = [
+    "--strict-markers",
+    "--strict-config",
+    "--verbose",
+    "--tb=short",
+    "--cov=py_github_analyzer",
+    "--cov-report=term-missing",
+    "--cov-report=html:htmlcov",
+    "--cov-report=xml:coverage.xml",
+    "--asyncio-mode=auto",
+    "--timeout=300",
+]
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+markers = [
+    "unit: Unit tests (fast, isolated)",
+    "integration: Integration tests (slower, may need external resources)",
+    "async_test: Tests that use async/await",
+    "slow: Tests that take longer to run (>5 seconds)",
+    "network: Tests that require network access",
+    "cli: Command-line interface tests",
+    "subprocess: Tests that use subprocess calls",
+]
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::PendingDeprecationWarning",
+    "ignore::pytest.PytestUnhandledThreadExceptionWarning",
+]
+asyncio_mode = "auto"
+timeout = 300
+timeout_method = "thread"
+
+# ==================================================
+# Coverage Configuration
+# ==================================================
+
+[tool.coverage.run]
+source = ["py_github_analyzer"]
+branch = true
+parallel = true
+omit = [
+    "tests/*",
+    "*/tests/*",
+    "setup.py",
+    "py_github_analyzer/__main__.py",
+    "*/__pycache__/*",
+    "*/.*",
+    "conftest.py",
+]
+concurrency = ["thread", "multiprocessing"]
+
+[tool.coverage.paths]
+source = [
+    "py_github_analyzer/",
+    "*/site-packages/py_github_analyzer/",
+    "*/py_github_analyzer/",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if self.debug:",
+    "if settings.DEBUG",
+    "raise AssertionError",
+    "raise NotImplementedError", 
+    "if 0:",
+    "if False:",
+    "if __name__ == .__main__.:",
+    "class .*\\bProtocol\\):",
+    "@(abc\\.)?abstractmethod",
+    "except ImportError:",
+    "except ModuleNotFoundError:",
+    "\\.\\.\\.",
+    "pass",
+    "# pragma: no cover",
+    "# nocov",
+]
+show_missing = true
+skip_covered = false
+skip_empty = false
+precision = 2
+sort = "Cover"
+fail_under = 80
+
+[tool.coverage.html]
+directory = "htmlcov"
+show_contexts = true
+skip_covered = false
+skip_empty = false
+
+[tool.coverage.xml]
+output = "coverage.xml"
+
+# ==================================================
+# Code Formatting and Linting
+# ==================================================
+
+[tool.black]
+line-length = 88
+target-version = ['py38', 'py39', 'py310', 'py311', 'py312', 'py313']
+include = '\\.pyi?$'
+extend-exclude = '''
+/(
+    \\.eggs
+  | \\.git
+  | \\.hg
+  | \\.mypy_cache
+  | \\.tox
+  | \\.venv
+  | venv
+  | \\.env
+  | env
+  | build
+  | dist
+  | __pycache__
+  | \\.pytest_cache
+  | htmlcov
+)/
+'''
+
+[tool.isort]
+profile = "black"
+line_length = 88
+multi_line_output = 3
+include_trailing_comma = true
+force_grid_wrap = 0
+use_parentheses = true
+ensure_newline_before_comments = true
+src_paths = ["py_github_analyzer", "tests"]
+skip_glob = [
+    "**/__pycache__/**",
+    "**/build/**",
+    "**/dist/**",
+    "**/.venv/**",
+    "**/venv/**",
+    "**/.env/**",
+    "**/env/**",
+]
+known_first_party = ["py_github_analyzer"]
+known_third_party = ["pytest", "httpx", "rich", "aiofiles", "requests"]
+sections = ["FUTURE", "STDLIB", "THIRDPARTY", "FIRSTPARTY", "LOCALFOLDER"]
+force_sort_within_sections = true
+combine_as_imports = true
+
+# ==================================================
+# Type Checking
+# ==================================================
+
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+warn_unreachable = true
+strict_equality = true
+show_error_codes = true
+namespace_packages = true
+explicit_package_bases = true
+follow_imports = "normal"
+ignore_missing_imports = false
+
+exclude = [
+    "^build/",
+    "^dist/",
+    "^docs/",
+    "^htmlcov/",
+    "^\\.tox/",
+    "^\\.venv/",
+    "^venv/",
+]
+
+[[tool.mypy.overrides]]
+module = ["tests.*"]
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+warn_no_return = false
+warn_unreachable = false
+
+[[tool.mypy.overrides]]
+module = [
+    "httpx.*",
+    "rich.*", 
+    "aiofiles.*",
+    "requests.*"
+]
+ignore_missing_imports = true
+
+# ==================================================
+# Security Scanning
+# ==================================================
+
+[tool.bandit]
+exclude_dirs = [
+    "tests", 
+    "build", 
+    "dist",
+    ".venv",
+    "venv",
+    ".tox",
+    ".pytest_cache",
+    "htmlcov",
+]
+skips = [
+    "B101",  # assert_used (we use assert in tests)
+    "B601",  # paramiko_calls (not applicable)
+    "B602",  # subprocess_popen_with_shell_equals_true (we handle this safely)
+]
+severity = "medium"
+confidence = "medium"
+
+[tool.bandit.assert_used]
+exclude = ["*test*.py", "*conftest*.py"]
+
+# ==================================================
+# Additional Development Tools
+# ==================================================
+
+# Ruff (fast alternative to flake8, isort, and some mypy checks)
+[tool.ruff]
+line-length = 88
+target-version = "py38"
+select = [
+    "E", "W", "F", "I", "N", "D", "UP", "B", "C4", "SIM", "TCH", "Q",
+    "RET", "TID", "ICN", "PIE"
+]
+ignore = [
+    "D100", "D104", "D107", "E501", "D203", "D213", "UP007"
+]
+exclude = [
+    ".git", "__pycache__", ".venv", "venv", ".env", "env", ".eggs", "*.egg",
+    "dist", "build", "docs", ".tox", ".mypy_cache", ".pytest_cache", "htmlcov",
+]
+respect-gitignore = true
+
+[tool.ruff.per-file-ignores]
+"__init__.py" = ["F401", "F403", "D104"]
+"tests/*" = ["D100", "D101", "D102", "D103", "D104", "S101", "S105", "S106"]
+"conftest.py" = ["D100", "D103"]
+"setup.py" = ["D100"]
+
+[tool.ruff.pydocstyle]
+convention = "google"
+
+[tool.ruff.isort]
+known-first-party = ["py_github_analyzer"]
+known-third-party = ["pytest", "httpx", "rich", "aiofiles", "requests"]
+
+[tool.ruff.mccabe]
+max-complexity = 10
+
+# ==================================================
+# Poe the Poet Task Runner
+# ==================================================
+[tool.poe.tasks]
+test = "pytest tests -v"
+test-unit = "pytest tests -v -m 'unit'"
+test-integration = "pytest tests -v -m 'integration'"
+lint = "flake8 py_github_analyzer tests"
+format = [
+    "black py_github_analyzer tests",
+    "isort py_github_analyzer tests"
+]
+format-check = [
+    "black --check py_github_analyzer tests",
+    "isort --check-only py_github_analyzer tests"
+]
+build = "python -m build"
+clean = [
+    "rm -rf build/",
+    "rm -rf dist/",
+    "rm -rf *.egg-info/",
+    "rm -rf .pytest_cache/",
+    "rm -rf .mypy_cache/",
+    "find . -type d -name '__pycache__' -exec rm -rf {} + 2>/dev/null || true"
+]
+
+# ==================================================
+# Build System Configuration
+# ==================================================
+
+[tool.setuptools]
+zip-safe = false
+include-package-data = true
+
+[tool.wheel]
+universal = false

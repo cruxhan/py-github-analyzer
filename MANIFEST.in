@@ -1,0 +1,25 @@
+# Include package data
+include README.md
+include LICENSE
+include pyproject.toml
+include .env.example
+
+# Include package files
+recursive-include py_github_analyzer *.py
+recursive-include py_github_analyzer *.json
+
+# Exclude test and development files
+exclude test_*.py
+exclude tests/*
+recursive-exclude * __pycache__
+recursive-exclude * *.py[co]
+recursive-exclude * .DS_Store
+recursive-exclude * Thumbs.db
+
+# Exclude build artifacts
+exclude build/*
+exclude dist/*
+exclude *.egg-info/*
+
+# Exclude requirements files (using pyproject.toml)
+exclude requirements*.txt

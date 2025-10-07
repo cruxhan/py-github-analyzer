@@ -36,10 +36,9 @@ High-performance async GitHub repository analyzer with AI-optimized code extract
 
 ### From PyPI (Recommended)
 
-```bash
-pip install py-github-analyzer
+```pip install py-github-analyzer
+
 From Source
-Bash
 
 git clone [https://github.com/cruxhan/py-github-analyzer.git](https://github.com/cruxhan/py-github-analyzer.git)
 cd py-github-analyzer

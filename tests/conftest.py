@@ -336,3 +336,138 @@ host = localhost
 port = 5432
 name = testdb
 """
+
+SAMPLE_PYTHON_FILE_WITH_ALL = """
+__all__ = ["PublicClass", "public_function"]
+
+class PublicClass:
+    \"\"\"A public class for testing.\"\"\"
+
+    def __init__(self, value: int) -> None:
+        self.value = value
+
+    def compute(self, multiplier: float = 1.0) -> float:
+        \"\"\"Multiply value by multiplier.\"\"\"
+        return self.value * multiplier
+
+    def _private_method(self) -> None:
+        pass
+
+    @staticmethod
+    def from_string(s: str) -> "PublicClass":
+        return PublicClass(int(s))
+
+
+class _PrivateClass:
+    def run(self) -> None:
+        pass
+
+
+def public_function(items: list, *, reverse: bool = False) -> list:
+    \"\"\"Return sorted items.\"\"\"
+    return sorted(items, reverse=reverse)
+
+
+def _private_function() -> None:
+    pass
+"""
+
+SAMPLE_ASYNC_PYTHON_FILE = """
+import asyncio
+from typing import Optional
+
+class AsyncWorker:
+    def __init__(self, name: str, timeout: float = 30.0) -> None:
+        self.name = name
+        self.timeout = timeout
+
+    async def run(self, payload: dict) -> Optional[dict]:
+        await asyncio.sleep(0)
+        return payload
+
+    async def __aenter__(self) -> "AsyncWorker":
+        return self
+
+    async def __aexit__(self, *args: object) -> None:
+        pass
+
+async def process(worker: AsyncWorker, data: dict) -> dict:
+    return await worker.run(data)
+"""
+
+SAMPLE_PYTHON_FILE_SYNTAX_ERROR = """
+def broken_function(
+    # 의도적 SyntaxError
+    x: int
+    y: int
+) -> int:
+    return x + y
+"""
+
+
+@pytest.fixture
+def sample_python_source():
+    """AST 테스트용 기본 Python 소스"""
+    return SAMPLE_PYTHON_FILE.strip()
+
+
+@pytest.fixture
+def sample_python_source_with_all():
+    """__all__ 정의가 포함된 Python 소스"""
+    return SAMPLE_PYTHON_FILE_WITH_ALL.strip()
+
+
+@pytest.fixture
+def sample_async_python_source():
+    """async 클래스/함수가 포함된 Python 소스"""
+    return SAMPLE_ASYNC_PYTHON_FILE.strip()
+
+
+@pytest.fixture
+def sample_syntax_error_source():
+    """SyntaxError가 포함된 Python 소스"""
+    return SAMPLE_PYTHON_FILE_SYNTAX_ERROR.strip()
+
+
+@pytest.fixture
+def sample_files_for_signature(sample_python_source, sample_async_python_source):
+    """ASTSignatureExtractor.extract_from_files 입력용 파일 목록"""
+    return [
+        {
+            "path": "src/core.py",
+            "name": "core.py",
+            "content": sample_python_source,
+        },
+        {
+            "path": "src/worker.py",
+            "name": "worker.py",
+            "content": sample_async_python_source,
+        },
+        {
+            "path": "src/config.json",
+            "name": "config.json",
+            "content": '{"key": "value"}',
+        },
+        {
+            "path": "src/empty.py",
+            "name": "empty.py",
+            "content": "",
+        },
+        {
+            "path": "src/broken.py",
+            "name": "broken.py",
+            "content": SAMPLE_PYTHON_FILE_SYNTAX_ERROR.strip(),
+        },
+    ]
+
+
+@pytest.fixture
+def expected_core_class_names():
+    """SAMPLE_PYTHON_FILE에서 추출될 public class 이름 목록"""
+    return ["TestClass"]
+
+
+@pytest.fixture
+def expected_core_function_names():
+    """SAMPLE_PYTHON_FILE에서 추출될 public function 이름 목록"""
+    return ["main"]

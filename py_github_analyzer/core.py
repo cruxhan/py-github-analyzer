@@ -3,6 +3,7 @@ import asyncio
 from typing import Any, Dict, List, Optional
 
 from .analysis import (
+    ASTSignatureExtractor,
     ApiAnalysisStrategy,
     FallbackAnalysisStrategy,
     ZipAnalysisStrategy,
@@ -40,6 +41,7 @@ class GitHubRepositoryAnalyzer:
         self._zip_strategy = ZipAnalysisStrategy(self.client, self.logger)
         self._api_strategy = ApiAnalysisStrategy(self.client, self.logger)
         self._fallback_strategy = FallbackAnalysisStrategy(self.client, self.logger)
+        self._signature_extractor = ASTSignatureExtractor(self.logger)
 
         self._log_initialization_info()
 
@@ -100,10 +102,19 @@ class GitHubRepositoryAnalyzer:
 
             if dry_run:
                 return {
-                    "success": True, "dry_run": True, "repository": f"{owner}/{repo}",
-                    "metadata": {"repo": f"{owner}/{repo}", "owner": owner, "name": repo,
-                                 "lang": ["Simulated"], "size": "Unknown"},
-                    "files": [], "output_paths": {}, "fallback_mode": False,
+                    "success": True,
+                    "dry_run": True,
+                    "repository": f"{owner}/{repo}",
+                    "metadata": {
+                        "repo": f"{owner}/{repo}",
+                        "owner": owner,
+                        "name": repo,
+                        "lang": ["Simulated"],
+                        "size": "Unknown",
+                    },
+                    "files": [],
+                    "output_paths": {},
+                    "fallback_mode": False,
                 }
 
             files, repo_info = await self._run_strategy(owner, repo, method)
@@ -128,7 +139,11 @@ class GitHubRepositoryAnalyzer:
             metadata_generator = MetadataGenerator(self.logger)
             metadata = await asyncio.to_thread(
                 self._safe_generate_metadata,
-                metadata_generator, processed_files, processing_metadata, repo_info, repo_url,
+                metadata_generator,
+                processed_files,
+                processing_metadata,
+                repo_info,
+                repo_url,
             )
 
             total_lines = sum(f.get("lines", 0) for f in processed_files if isinstance(f, dict))
@@ -139,10 +154,14 @@ class GitHubRepositoryAnalyzer:
             )
 
             return {
-                "success": True, "repository": f"{owner}/{repo}",
-                "metadata": metadata, "files": processed_files,
-                "output_paths": output_paths, "fallback_mode": False,
-                "analysis_method": method, "token_used": bool(self.token),
+                "success": True,
+                "repository": f"{owner}/{repo}",
+                "metadata": metadata,
+                "files": processed_files,
+                "output_paths": output_paths,
+                "fallback_mode": False,
+                "analysis_method": method,
+                "token_used": bool(self.token),
             }
 
         except Exception as e:
@@ -154,14 +173,21 @@ class GitHubRepositoryAnalyzer:
                 try:
                     url_info = URLParser.parse_github_url(repo_url)
                     fallback_result = await self._run_fallback(
-                        url_info["owner"], url_info["repo"],
-                        output_dir, output_format,
-                        original_error_info={"error_type": type(original_error).__name__,
-                                              "error_message": str(original_error),
-                                              "analysis_method": method},
+                        url_info["owner"],
+                        url_info["repo"],
+                        output_dir,
+                        output_format,
+                        original_error_info={
+                            "error_type": type(original_error).__name__,
+                            "error_message": str(original_error),
+                            "analysis_method": method,
+                        },
                     )
                     if fallback_result.get("success"):
-                        fallback_result["original_error"] = {"type": type(original_error).__name__, "message": str(original_error)}
+                        fallback_result["original_error"] = {
+                            "type": type(original_error).__name__,
+                            "message": str(original_error),
+                        }
                         fallback_result["fallback_triggered"] = True
                     return fallback_result
                 except Exception as fe:
@@ -173,16 +199,127 @@ class GitHubRepositoryAnalyzer:
                     "error_message": self._comprehensive_error_message(original_error, fallback_error),
                     "original_error": {"type": type(original_error).__name__, "message": str(original_error)},
                     "fallback_error": {"type": type(fallback_error).__name__, "message": str(fallback_error)} if fallback_error else None,
-                    "repository": repo_url, "fallback_mode": True,
-                    "analysis_method": method, "token_available": bool(self.token),
+                    "repository": repo_url,
+                    "fallback_mode": True,
+                    "analysis_method": method,
+                    "token_available": bool(self.token),
                 }
 
             return {
                 "success": False,
                 "error_message": f"Analysis failed: {type(original_error).__name__}: {original_error}",
                 "error_type": type(original_error).__name__,
-                "repository": repo_url, "fallback_mode": False,
-                "analysis_method": method, "token_available": bool(self.token),
+                "repository": repo_url,
+                "fallback_mode": False,
+                "analysis_method": method,
+                "token_available": bool(self.token),
+            }
+
+    async def analyze_signatures_async(
+        self,
+        repo_url: str,
+        method: str = "auto",
+        verbose: bool = False,
+        fallback: bool = True,
+        include_docstring: bool = False,
+        public_only: bool = True,
+        include_private_magic_methods: bool = True,
+        output_dir: Optional[str] = None,
+        output_format: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        original_error: Optional[Exception] = None
+        fallback_error: Optional[Exception] = None
+
+        try:
+            url_info = URLParser.parse_github_url(repo_url)
+            owner, repo = url_info["owner"], url_info["repo"]
+
+            if verbose:
+                self.logger.info(f"Analyzing signatures for repository: {owner}/{repo}")
+                self.logger.info(
+                    f"Method: {method} | include_docstring: {include_docstring} | public_only: {public_only}"
+                )
+
+            files, repo_info = await self._run_strategy(owner, repo, method)
+
+            if not files:
+                self.logger.warning(f"No files extracted from repository: {repo_url}")
+                raise EmptyRepositoryError(f"No files found in repository: {owner}/{repo}")
+
+            signature_result = await asyncio.to_thread(
+                self._signature_extractor.extract_from_files,
+                files,
+                include_docstring,
+                public_only,
+                include_private_magic_methods,
+            )
+
+            signature_result["success"] = True
+            signature_result["repository"] = f"{owner}/{repo}"
+            signature_result["repo_info"] = repo_info
+            signature_result["analysis_method"] = method
+            signature_result["token_used"] = bool(self.token)
+
+            if output_dir and output_format:
+                output_paths = await self.output_writer.write(
+                    output_dir,
+                    output_format,
+                    {
+                        "repo": f"{owner}/{repo}",
+                        "type": "signatures",
+                        "include_docstring": include_docstring,
+                        "public_only": public_only,
+                        "file_count": signature_result.get("summary", {}).get("files_analyzed", 0),
+                        "class_count": signature_result.get("summary", {}).get("classes", 0),
+                        "function_count": signature_result.get("summary", {}).get("functions", 0),
+                        "method_count": signature_result.get("summary", {}).get("methods", 0),
+                        "version": Config.VERSION,
+                    },
+                    signature_result.get("files", []),
+                    f"{owner}_{repo}_signatures",
+                )
+                signature_result["output_paths"] = output_paths
+            else:
+                signature_result["output_paths"] = {}
+
+            return signature_result
+
+        except Exception as e:
+            original_error = e
+            self.logger.error(f"Signature analysis failed: {type(e).__name__}: {e}")
+
+            if fallback:
+                try:
+                    return {
+                        "success": False,
+                        "repository": repo_url,
+                        "fallback_mode": True,
+                        "analysis_method": method,
+                        "error_message": self._comprehensive_error_message(original_error, fallback_error),
+                        "files": [],
+                        "summary": {
+                            "files_analyzed": 0,
+                            "classes": 0,
+                            "functions": 0,
+                            "methods": 0,
+                        },
+                    }
+                except Exception as fe:
+                    fallback_error = fe
+
+            return {
+                "success": False,
+                "repository": repo_url,
+                "fallback_mode": False,
+                "analysis_method": method,
+                "error_message": self._comprehensive_error_message(original_error, fallback_error),
+                "files": [],
+                "summary": {
+                    "files_analyzed": 0,
+                    "classes": 0,
+                    "functions": 0,
+                    "methods": 0,
+                },
             }
 
     async def _run_strategy(
@@ -251,19 +388,25 @@ class GitHubRepositoryAnalyzer:
             )
             self.logger.warning("Fallback analysis completed with limited data")
             return {
-                "success": True, "repository": f"{owner}/{repo}",
-                "metadata": fallback_metadata, "files": [],
-                "output_paths": output_paths, "fallback_mode": True,
-                "analysis_method": "fallback", "original_error": original_error_info,
+                "success": True,
+                "repository": f"{owner}/{repo}",
+                "metadata": fallback_metadata,
+                "files": [],
+                "output_paths": output_paths,
+                "fallback_mode": True,
+                "analysis_method": "fallback",
+                "original_error": original_error_info,
                 "warning": "Analysis completed in fallback mode with limited repository information only",
             }
         except Exception as e:
             error_msg = f"Fallback analysis failed: {type(e).__name__}: {e}"
             self.logger.error(error_msg)
             result: Dict[str, Any] = {
-                "success": False, "error_message": error_msg,
+                "success": False,
+                "error_message": error_msg,
                 "fallback_error": {"type": type(e).__name__, "message": str(e)},
-                "repository": f"{owner}/{repo}", "fallback_mode": True,
+                "repository": f"{owner}/{repo}",
+                "fallback_mode": True,
                 "analysis_method": "fallback_failed",
             }
             if original_error_info:
@@ -310,7 +453,8 @@ class GitHubRepositoryAnalyzer:
             "lang": ["Unknown"],
             "size": {"display_size": "0KB"},
             "files": len(processed_files) if isinstance(processed_files, list) else 0,
-            "main": [], "deps": [],
+            "main": [],
+            "deps": [],
             "created": int(time.time()),
             "version": Config.VERSION,
             "analysis_mode": "error_fallback",
@@ -346,10 +490,21 @@ class GitHubRepositoryAnalyzer:
 
 async def analyze_repository_async(repo_url: str, **kwargs) -> Dict[str, Any]:
     analyzer = GitHubRepositoryAnalyzer(
-        token=kwargs.get("github_token"),
-        logger=kwargs.get("logger"),
+        token=kwargs.pop("github_token", None),
+        logger=kwargs.pop("logger", None),
     )
     try:
         return await analyzer.analyze_repository_async(repo_url, **kwargs)
+    finally:
+        await analyzer.close()
+
+
+async def analyze_signatures_async(repo_url: str, **kwargs) -> Dict[str, Any]:
+    analyzer = GitHubRepositoryAnalyzer(
+        token=kwargs.pop("github_token", None),
+        logger=kwargs.pop("logger", None),
+    )
+    try:
+        return await analyzer.analyze_signatures_async(repo_url, **kwargs)
     finally:
         await analyzer.close()

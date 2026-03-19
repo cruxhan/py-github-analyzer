@@ -498,13 +498,139 @@ async def analyze_repository_async(repo_url: str, **kwargs) -> Dict[str, Any]:
     finally:
         await analyzer.close()
 
+async def analyze_signatures_async(
+    self,
+    repo_url: str,
+    method: str = "auto",
+    verbose: bool = False,
+    fallback: bool = True,
+    include_docstring: bool = False,
+    public_only: bool = True,
+    include_private_magic_methods: bool = True,
+    output_dir: Optional[str] = None,
+    output_format: Optional[str] = None,
+) -> Dict[str, Any]:
+    original_error: Optional[Exception] = None
+    fallback_error: Optional[Exception] = None
 
-async def analyze_signatures_async(repo_url: str, **kwargs) -> Dict[str, Any]:
-    analyzer = GitHubRepositoryAnalyzer(
-        token=kwargs.pop("github_token", None),
-        logger=kwargs.pop("logger", None),
-    )
     try:
-        return await analyzer.analyze_signatures_async(repo_url, **kwargs)
-    finally:
-        await analyzer.close()
+        url_info = URLParser.parse_github_url(repo_url)
+        owner, repo = url_info["owner"], url_info["repo"]
+
+        if verbose:
+            self.logger.info(f"Analyzing signatures for repository: {owner}/{repo}")
+            self.logger.info(
+                f"Method: {method} | include_docstring: {include_docstring} | public_only: {public_only}"
+            )
+
+        files, repo_info = await self._run_strategy(owner, repo, method)
+
+        if not files:
+            self.logger.warning(f"No files extracted from repository: {repo_url}")
+            raise EmptyRepositoryError(f"No files found in repository: {owner}/{repo}")
+
+        signature_result = await asyncio.to_thread(
+            self._signature_extractor.extract_from_files,
+            files,
+            include_docstring,
+            public_only,
+            include_private_magic_methods,
+        )
+
+        extracted_files: List[Dict[str, Any]] = signature_result.get("files", [])
+
+        files_with_content = [
+            f for f in extracted_files
+            if f.get("classes") or f.get("functions")
+        ]
+        classes_count = sum(len(f.get("classes", [])) for f in extracted_files)
+        methods_count = sum(
+            len(cls.get("methods", []))
+            for f in extracted_files
+            for cls in f.get("classes", [])
+        )
+        functions_count = sum(len(f.get("functions", [])) for f in extracted_files)
+        files_skipped = len(extracted_files) - len(files_with_content)
+
+        computed_summary: Dict[str, Any] = {
+            "files_analyzed": len(files_with_content),
+            "files_skipped": files_skipped,
+            "classes": classes_count,
+            "methods": methods_count,
+            "functions": functions_count,
+        }
+
+        signature_result["summary"] = computed_summary
+        signature_result["success"] = True
+        signature_result["repository"] = f"{owner}/{repo}"
+        signature_result["repo_info"] = repo_info
+        signature_result["analysis_method"] = method
+        signature_result["token_used"] = bool(self.token)
+
+        self.logger.info(
+            f"Signature extraction complete: {len(files_with_content)} files, "
+            f"{classes_count} classes, {methods_count} methods, {functions_count} top-level functions"
+        )
+
+        if output_dir and output_format:
+            output_paths = await self.output_writer.write(
+                output_dir,
+                output_format,
+                {
+                    "repo": f"{owner}/{repo}",
+                    "type": "signatures",
+                    "include_docstring": include_docstring,
+                    "public_only": public_only,
+                    "file_count": computed_summary["files_analyzed"],
+                    "class_count": computed_summary["classes"],
+                    "function_count": computed_summary["functions"],
+                    "method_count": computed_summary["methods"],
+                    "version": Config.VERSION,
+                },
+                extracted_files,
+                f"{owner}_{repo}_signatures",
+            )
+            signature_result["output_paths"] = output_paths
+        else:
+            signature_result["output_paths"] = {}
+
+        return signature_result
+
+    except Exception as e:
+        original_error = e
+        self.logger.error(f"Signature analysis failed: {type(e).__name__}: {e}")
+
+        empty_summary: Dict[str, Any] = {
+            "files_analyzed": 0,
+            "files_skipped": 0,
+            "classes": 0,
+            "functions": 0,
+            "methods": 0,
+        }
+
+        if fallback:
+            try:
+                return {
+                    "success": False,
+                    "repository": repo_url,
+                    "fallback_mode": True,
+                    "analysis_method": method,
+                    "error_message": self._comprehensive_error_message(original_error, fallback_error),
+                    "files": [],
+                    "summary": empty_summary,
+                    "output_paths": {},
+                }
+            except Exception as fe:
+                fallback_error = fe
+
+        return {
+            "success": False,
+            "repository": repo_url,
+            "fallback_mode": False,
+            "analysis_method": method,
+            "error_message": self._comprehensive_error_message(original_error, fallback_error),
+            "files": [],
+            "summary": empty_summary,
+            "output_paths": {},
+        }
+

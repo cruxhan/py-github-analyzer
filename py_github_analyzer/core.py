@@ -3,8 +3,8 @@ import asyncio
 from typing import Any, Dict, List, Optional
 
 from .analysis import (
-    ASTSignatureExtractor,
     ApiAnalysisStrategy,
+    ASTSignatureExtractor,
     FallbackAnalysisStrategy,
     ZipAnalysisStrategy,
 )

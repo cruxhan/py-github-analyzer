@@ -46,6 +46,7 @@ results/
 logs/
 *.prof
 profile.stats
+output/
 
 # ===================================================================
 # IDEs and Editors

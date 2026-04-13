@@ -1,11 +1,4 @@
-"""
-
-Utility functions and classes for py-github-analyzer
-
-URL parsing, file operations, and token management utilities
-
-"""
-
+# py_github_analyzer/utils.py
 import re
 import os
 import gzip
@@ -27,7 +20,7 @@ from .exceptions import ValidationError, CompressionError
 
 class URLParser:
     """GitHub URL parsing and validation utilities"""
-    
+
     GITHUB_URL_PATTERN = re.compile(
         r'(?:https?://)?github\.com[/:](?P<owner>[^/\s]+)[/:](?P<repo>[^/\s\.]+)(?:\.git)?(?:/(?P<path>.+))?',
         re.IGNORECASE
@@ -38,12 +31,11 @@ class URLParser:
         """Parse GitHub URL and extract owner, repo, and optional path"""
         if not url:
             raise ValidationError("Empty URL provided")
-        
+
         url = url.strip().rstrip('/')
         if not url:
             raise ValidationError("Invalid GitHub URL format")
-        
-        # Handle different URL formats
+
         if not url.startswith(('http', 'https')):
             if url.startswith('github.com'):
                 url = f"https://{url}"
@@ -51,26 +43,25 @@ class URLParser:
                 url = f"https://github.com/{url}"
             else:
                 url = f"https://github.com/{url}"
-        
+
         match = cls.GITHUB_URL_PATTERN.match(url)
         if not match:
             raise ValidationError(
                 f"Invalid GitHub URL format: {url}. "
                 "Expected format: https://github.com/owner/repo"
             )
-        
+
         result = match.groupdict()
         if not result['owner'] or not result['repo']:
             raise ValidationError("URL must contain both owner and repository name")
-        
-        # Clean up repo name
+
         if result['repo'].endswith('.git'):
             result['repo'] = result['repo'][:-4]
-        
+
         return {
             'owner': result['owner'],
             'repo': result['repo'],
-            'path': result.get('path') or '',  # Always string, never None
+            'path': result.get('path') or '',
             'full_name': f"{result['owner']}/{result['repo']}"
         }
 
@@ -115,30 +106,24 @@ class ValidationUtils:
         if not token:
             return False
 
-        # GitHub personal access tokens (classic) - exactly 40 chars starting with ghp_
         if token.startswith('ghp_'):
             return len(token) == 40
 
-        # GitHub App tokens - exactly 40 chars starting with ghs_
         if token.startswith('ghs_'):
             return len(token) == 40
 
-        # GitHub OAuth tokens - exactly 40 chars starting with gho_
         if token.startswith('gho_'):
             return len(token) == 40
 
-        # GitHub refresh tokens - exactly 40 chars starting with ghr_
         if token.startswith('ghr_'):
             return len(token) == 40
 
-        # Fine-grained personal access tokens - starts with github_pat_ and longer than 80 chars
         if token.startswith('github_pat_'):
             return len(token) >= 80
 
-        # Legacy tokens (40 characters, hexadecimal)
         if len(token) == 40:
             try:
-                int(token, 16)  # Check if it's valid hexadecimal
+                int(token, 16)
                 return True
             except ValueError:
                 return False
@@ -150,27 +135,21 @@ class ValidationUtils:
         """Validate file path for security"""
         if not file_path:
             return False
-        
-        # Check for path traversal attacks
-        if '..' in file_path:
+
+        normalized = file_path.replace('\\', '/')
+
+        if '..' in normalized:
             return False
-        
-        # Check for absolute paths
-        if file_path.startswith('/'):
+
+        if normalized.startswith('/'):
             return False
-        
-        # Check for Windows absolute paths
-        if len(file_path) > 1 and file_path[1] == ':':
+
+        if len(normalized) > 1 and normalized[1] == ':':
             return False
-        
-        # Check for backslashes (Windows path separators)
-        if '\\' in file_path:  # Fixed: single backslash check
+
+        if normalized.startswith('./') or '/./' in normalized:
             return False
-        
-        # Check for relative path indicators
-        if file_path.startswith('./') or '/./' in file_path:
-            return False
-        
+
         return True
 
     @staticmethod
@@ -178,36 +157,28 @@ class ValidationUtils:
         """Sanitize filename for safe filesystem usage"""
         if not filename:
             return "sanitized_file"
-        
-        # Remove path components
+
         filename = os.path.basename(filename)
-        
-        # Remove or replace dangerous characters
-        # Keep alphanumeric, dots, hyphens, underscores, and parentheses
+
         safe_filename = re.sub(r'[<>:"/\\|?*\x00-\x1f]', '', filename)
-        safe_filename = re.sub(r'[ ]+', '_', safe_filename)  # Replace spaces with underscores
-        
-        # Remove leading/trailing dots and spaces
+        safe_filename = re.sub(r'[ ]+', '_', safe_filename)
+
         safe_filename = safe_filename.strip(' .')
-        
-        # Handle edge cases
+
         if not safe_filename:
             return "sanitized_file"
-        
-        # Remove trailing dots (Windows issue)
+
         safe_filename = safe_filename.rstrip('.')
-        
-        # Handle hidden files (starting with dot)
+
         if safe_filename.startswith('.'):
             safe_filename = safe_filename[1:]
             if not safe_filename:
                 return "hidden"
-        
-        # Limit length
+
         if len(safe_filename) > 200:
             name, ext = os.path.splitext(safe_filename)
             safe_filename = name[:200-len(ext)] + ext
-        
+
         return safe_filename
 
     @staticmethod
@@ -215,21 +186,18 @@ class ValidationUtils:
         """Check if path is safe (no directory traversal)"""
         if not path:
             return False
-        
-        # Normalize the path
+
         try:
             normalized = os.path.normpath(path)
         except ValueError:
             return False
-        
-        # Check for directory traversal
+
         if normalized.startswith('..') or '/..' in normalized or '\\..\\' in normalized:
             return False
-        
-        # Check for absolute paths
+
         if os.path.isabs(normalized):
             return False
-        
+
         return True
 
     @staticmethod
@@ -254,16 +222,13 @@ class ValidationUtils:
             return False
 
         ext = Path(filename).suffix.lower()
-        
-        # Check binary extensions
+
         if ext in Config.BINARY_EXTENSIONS:
             return False
 
-        # Check supported text extensions
         if ext in sum(Config.SUPPORTED_EXTENSIONS.values(), []):
             return True
 
-        # Try to decode content if provided
         if content and len(content) > 0:
             try:
                 content[:1024].decode('utf-8')
@@ -271,14 +236,12 @@ class ValidationUtils:
             except UnicodeDecodeError:
                 return False
 
-        # Check MIME type
         mime_type, _ = mimetypes.guess_type(filename)
         if mime_type:
             return mime_type.startswith('text/') or mime_type in [
                 'application/json', 'application/xml', 'application/javascript'
             ]
 
-        # Default to text if uncertain
         return True
 
 
@@ -292,7 +255,6 @@ class FileUtils:
             with open(file_path, 'r', encoding=encoding) as f:
                 return f.read()
         except UnicodeDecodeError:
-            # Try alternative encodings
             for fallback_encoding in ['latin-1', 'cp1252', 'utf-16']:
                 try:
                     with open(file_path, 'r', encoding=fallback_encoding) as f:
@@ -338,12 +300,10 @@ class FileUtils:
                 chunk = f.read(check_size)
                 if not chunk:
                     return False
-                
-                # Look for null bytes (common in binary files)
+
                 if b'\x00' in chunk:
                     return True
-                
-                # Check for high percentage of non-text characters
+
                 text_chars = sum(1 for byte in chunk if 32 <= byte <= 126 or byte in [9, 10, 13])
                 return (text_chars / len(chunk)) < 0.75
         except (FileNotFoundError, PermissionError, OSError):
@@ -370,7 +330,7 @@ class FileUtils:
     def safe_filename(filename: str) -> str:
         """Create safe filename for filesystem"""
         safe_chars = re.sub(r'[<>:"/\\|?*]', '_', filename)
-        return safe_chars[:200]  # Limit length
+        return safe_chars[:200]
 
     @staticmethod
     def count_lines(content: str) -> int:
@@ -382,17 +342,15 @@ class FileUtils:
     @staticmethod
     def detect_encoding(content: bytes) -> str:
         """Detect text encoding using built-in methods"""
-        # Simple encoding detection without external dependencies
         encodings = ['utf-8', 'utf-16', 'utf-16-le', 'utf-16-be', 'latin-1', 'cp1252', 'ascii']
-        
+
         for encoding in encodings:
             try:
                 content.decode(encoding)
                 return encoding
             except UnicodeDecodeError:
                 continue
-        
-        # Final fallback
+
         return 'utf-8'
 
 
@@ -416,39 +374,38 @@ class CompressionUtils:
         """Decompress file to target location"""
         source_path = Path(source_path)
         target_path = Path(target_path)
-        
+
         compression = CompressionUtils.detect_compression(str(source_path))
-        
+
         try:
             with open(source_path, 'rb') as src:
                 content = src.read()
-            
+
             if compression == 'gzip':
                 content = gzip.decompress(content)
             elif compression == 'bzip2':
                 content = bz2.decompress(content)
             elif compression == 'lzma':
                 content = lzma.decompress(content)
-            # If no compression, content remains as-is
-            
+
             with open(target_path, 'wb') as tgt:
                 tgt.write(content)
-            
+
             return True
         except Exception as e:
             raise CompressionError(f"Decompression failed: {e}")
 
     @staticmethod
-    def compress_file(source_path: Union[str, Path], target_path: Union[str, Path], 
-                     compression: str) -> bool:
+    def compress_file(source_path: Union[str, Path], target_path: Union[str, Path],
+                      compression: str) -> bool:
         """Compress file to target location"""
         source_path = Path(source_path)
         target_path = Path(target_path)
-        
+
         try:
             with open(source_path, 'rb') as src:
                 content = src.read()
-            
+
             if compression == 'gzip':
                 content = gzip.compress(content)
             elif compression == 'bzip2':
@@ -457,10 +414,10 @@ class CompressionUtils:
                 content = lzma.compress(content)
             else:
                 raise CompressionError(f"Unsupported compression format: {compression}")
-            
+
             with open(target_path, 'wb') as tgt:
                 tgt.write(content)
-            
+
             return True
         except Exception as e:
             raise CompressionError(f"Compression failed: {e}")
@@ -508,7 +465,7 @@ class RetryUtils:
             @wraps(func)
             def wrapper(*args, **kwargs):
                 last_exception = None
-                
+
                 for attempt in range(max_attempts):
                     try:
                         return func(*args, **kwargs)
@@ -520,7 +477,7 @@ class RetryUtils:
                             time.sleep(delay)
                         else:
                             break
-                
+
                 raise last_exception
             return wrapper
         return decorator
@@ -537,26 +494,22 @@ class TokenUtils:
             with open(env_path, 'r', encoding='utf-8') as f:
                 for line in f:
                     line = line.strip()
-                    # Skip empty lines and comments
                     if not line or line.startswith('#'):
                         continue
-                    
-                    # Parse KEY=VALUE format
+
                     if '=' in line:
                         key, value = line.split('=', 1)
                         key = key.strip()
                         value = value.strip()
-                        
-                        # Remove quotes if present
+
                         if (value.startswith('"') and value.endswith('"')) or \
                            (value.startswith("'") and value.endswith("'")):
                             value = value[1:-1]
-                        
+
                         env_vars[key] = value
         except (FileNotFoundError, PermissionError, UnicodeDecodeError):
-            # Silently ignore file access errors
             pass
-        
+
         return env_vars
 
     @staticmethod
@@ -564,31 +517,29 @@ class TokenUtils:
         """Find .env files in current directory and parent directories"""
         env_files = []
         current_dir = Path.cwd()
-        
-        # Check current directory and up to 3 parent directories
+
         for _ in range(4):
             env_file = current_dir / '.env'
             if env_file.exists() and env_file.is_file():
                 env_files.append(str(env_file))
-            
+
             parent = current_dir.parent
-            if parent == current_dir:  # Reached root
+            if parent == current_dir:
                 break
             current_dir = parent
-        
+
         return env_files
 
     @staticmethod
     def _load_env_variables() -> Dict[str, str]:
         """Load environment variables from .env files"""
         all_env_vars = {}
-        
-        # Find and parse .env files
+
         env_files = TokenUtils._find_env_files()
         for env_file in env_files:
             env_vars = TokenUtils._parse_env_file(env_file)
             all_env_vars.update(env_vars)
-        
+
         return all_env_vars
 
     @staticmethod
@@ -602,24 +553,20 @@ class TokenUtils:
         5. .env file GH_TOKEN
         6. None if not found
         """
-        # Priority 1: Explicitly provided token
         if provided_token and provided_token.strip():
             return provided_token.strip()
-        
-        # Priority 2-3: System environment variables
+
         for env_var in ['GITHUB_TOKEN', 'GH_TOKEN']:
             token = os.environ.get(env_var)
             if token and token.strip():
                 return token.strip()
-        
-        # Priority 4-5: .env file variables
+
         env_vars = TokenUtils._load_env_variables()
         for env_var in ['GITHUB_TOKEN', 'GH_TOKEN']:
             token = env_vars.get(env_var)
             if token and token.strip():
                 return token.strip()
-        
-        # Priority 6: No token found
+
         return None
 
     @staticmethod
@@ -627,10 +574,10 @@ class TokenUtils:
         """Mask token for safe logging"""
         if not token:
             return "None"
-        
+
         if len(token) <= 8:
             return "***"
-        
+
         return f"{token[:4]}...{token[-4:]}"
 
     @staticmethod
@@ -653,7 +600,6 @@ class TokenUtils:
         masked = TokenUtils.mask_token(token)
         valid = TokenUtils.validate_token_format(token)
 
-        # Determine token type
         token_type = 'unknown'
         if token.startswith('ghp_'):
             token_type = 'classic'
@@ -668,7 +614,6 @@ class TokenUtils:
         elif len(token) == 40 and all(c in '0123456789abcdef' for c in token.lower()):
             token_type = 'legacy'
 
-        # Determine source
         source = 'parameter'
         if os.environ.get('GITHUB_TOKEN') == token:
             source = 'GITHUB_TOKEN env'

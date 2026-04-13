@@ -121,6 +121,8 @@ def extract_signatures_from_source(
     public_only: bool = True,
     include_private_magic_methods: bool = True,
 ) -> Dict[str, Any]:
+    source = source.lstrip('\ufeff')
+
     try:
         tree = ast.parse(source)
     except SyntaxError as e:
